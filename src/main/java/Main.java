@@ -71,7 +71,42 @@ public class Main {
     }
 
     private static Collection<String> getPlaylist(String playlistId) throws Exception {
-        URL url = new URL(BASE_URL + "/playlistItems?part=contentDetails&playlistId=" + playlistId + "&key=" + API_KEY);
+        Collection<String> playlist = new ArrayList<String>();
+
+        String nextPageToken = null;
+
+        // Loop through all pages of playlist pagination
+        do {
+            JSONObject response = getResponse(playlistId, nextPageToken);
+
+            try {
+                nextPageToken = response.getString("nextPageToken");
+            } catch (Exception e) {
+                nextPageToken = null;
+            }
+
+            // Parse the response for all videos and add them to a collection
+            JSONArray videos = response.getJSONArray("items");
+
+            for (int i = 0; i < videos.length(); i++) {
+                playlist.add(videos.getJSONObject(i).getJSONObject("contentDetails").getString("videoId"));
+            }
+        }
+        while (nextPageToken != null);
+
+        return playlist;
+    }
+
+    private static JSONObject getResponse(String playlistId, String pageToken) throws Exception {
+
+        URL url;
+
+        if (pageToken != null) {
+            url = new URL(BASE_URL + "/playlistItems?part=contentDetails" + "&pageToken=" + pageToken + "&playlistId=" + playlistId + "&key=" + API_KEY);
+        } else {
+            url = new URL(BASE_URL + "/playlistItems?part=contentDetails" + "&playlistId=" + playlistId + "&key=" + API_KEY);
+        }
+
 
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
@@ -87,20 +122,10 @@ public class Main {
         while ((line = br.readLine()) != null) {
             output += line + "\n";
         }
-        //System.out.println(output);
+//        System.out.println(output);
         conn.disconnect();
 
-        JSONObject response = new JSONObject(output);
-
-        // Parse the response for all videos and add them to a collection
-        JSONArray videos = response.getJSONArray("items");
-        Collection<String> playlist = new ArrayList<String>();
-
-        for (int i = 0; i < videos.length(); i++) {
-            playlist.add(videos.getJSONObject(i).getJSONObject("contentDetails").getString("videoId"));
-        }
-
-        return playlist;
+        return new JSONObject(output);
     }
 
     private static String getVideoTitle(String id) throws Exception {
@@ -162,8 +187,7 @@ public class Main {
             if (in != null) {
                 try {
                     in.close();
-                }
-                catch (Exception e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
